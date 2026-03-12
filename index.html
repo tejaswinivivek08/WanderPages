@@ -9,6 +9,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/TDdo=" crossorigin=""></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <style>
 /* ═══════════════════════════════
    RESET & VARIABLES
@@ -1096,6 +1097,368 @@ textarea::placeholder { color:#c4b896; }
   .bt-header,.bt-row { grid-template-columns:1fr 90px 90px; }
   .bt-remove { display:none; }
 }
+
+/* ═══════════════════════════════
+   TRAVEL MAP PAGE
+═══════════════════════════════ */
+#page-travelmap {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: #0d1b35;
+  transition: background .4s;
+}
+#page-travelmap.tmap-light { background: #eef2f7; }
+
+/* Top bar */
+.tmap-topbar {
+  position: relative; z-index: 600; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 22px; height: 58px;
+  background: rgba(8,13,28,.88);
+  backdrop-filter: blur(18px);
+  border-bottom: 1px solid rgba(245,184,0,.13);
+}
+#page-travelmap.tmap-light .tmap-topbar {
+  background: rgba(255,255,255,.92);
+  border-bottom: 1px solid rgba(0,0,0,.07);
+}
+.tmap-title {
+  font-family: 'DM Serif Display', serif; font-size: 20px; color: #f5b800;
+  display: flex; align-items: center; gap: 10px;
+}
+#page-travelmap.tmap-light .tmap-title { color: var(--olive); }
+.tmap-back-btn {
+  background: none; border: none; cursor: pointer;
+  color: rgba(255,255,255,.45); font-size: 18px; padding: 4px 10px 4px 0;
+  transition: color .2s; line-height: 1;
+}
+.tmap-back-btn:hover { color: #f5b800; }
+#page-travelmap.tmap-light .tmap-back-btn { color: rgba(0,0,0,.35); }
+#page-travelmap.tmap-light .tmap-back-btn:hover { color: var(--olive); }
+.tmap-topbar-actions { display: flex; gap: 8px; }
+.tmap-icon-btn {
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.13);
+  border-radius: 22px; padding: 6px 14px;
+  font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600;
+  color: rgba(255,255,255,.65); cursor: pointer; transition: all .2s; white-space: nowrap;
+}
+.tmap-icon-btn:hover { background: rgba(245,184,0,.15); border-color: rgba(245,184,0,.4); color: #f5b800; }
+#page-travelmap.tmap-light .tmap-icon-btn {
+  background: rgba(0,0,0,.05); border-color: rgba(0,0,0,.1); color: rgba(0,0,0,.55);
+}
+#page-travelmap.tmap-light .tmap-icon-btn:hover { background: rgba(74,68,40,.08); color: var(--olive); border-color: var(--olive); }
+
+/* Stats bar */
+.tmap-stats-bar {
+  position: relative; z-index: 600; flex-shrink: 0;
+  display: flex; align-items: center; gap: 0; padding: 0 22px; height: 44px;
+  background: rgba(8,13,28,.72);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(255,255,255,.04);
+  overflow-x: auto;
+}
+.tmap-stats-bar::-webkit-scrollbar { display: none; }
+#page-travelmap.tmap-light .tmap-stats-bar {
+  background: rgba(255,255,255,.78);
+  border-bottom: 1px solid rgba(0,0,0,.05);
+}
+.tmap-stat {
+  display: flex; align-items: center; gap: 6px;
+  font-family: 'Inter', sans-serif; font-size: 11.5px; font-weight: 500;
+  color: rgba(255,255,255,.6); padding-right: 18px; white-space: nowrap;
+}
+#page-travelmap.tmap-light .tmap-stat { color: rgba(0,0,0,.5); }
+.tmap-stat-num {
+  font-family: 'Playfair Display', serif; font-size: 17px; font-weight: 700;
+  color: #f5b800;
+}
+#page-travelmap.tmap-light .tmap-stat-num { color: var(--olive); }
+.tmap-stat-sep {
+  width: 1px; height: 20px; background: rgba(255,255,255,.1); margin-right: 18px; flex-shrink: 0;
+}
+#page-travelmap.tmap-light .tmap-stat-sep { background: rgba(0,0,0,.1); }
+
+/* Search bar */
+.tmap-searchbar {
+  position: relative; z-index: 600; flex-shrink: 0;
+  display: flex; align-items: center; gap: 10px; padding: 9px 18px;
+  background: rgba(8,13,28,.65);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255,255,255,.04);
+}
+#page-travelmap.tmap-light .tmap-searchbar {
+  background: rgba(255,255,255,.78);
+  border-bottom: 1px solid rgba(0,0,0,.05);
+}
+.tmap-search-wrap { flex: 1; position: relative; }
+.tmap-search-input {
+  width: 100%; padding: 9px 16px 9px 38px;
+  background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.12);
+  border-radius: 22px; outline: none;
+  font-family: 'Inter', sans-serif; font-size: 13px;
+  color: #fff; transition: all .2s;
+}
+.tmap-search-input::placeholder { color: rgba(255,255,255,.32); }
+.tmap-search-input:focus { background: rgba(255,255,255,.11); border-color: rgba(245,184,0,.5); }
+#page-travelmap.tmap-light .tmap-search-input {
+  background: rgba(0,0,0,.05); border-color: rgba(0,0,0,.12); color: #111;
+}
+#page-travelmap.tmap-light .tmap-search-input::placeholder { color: rgba(0,0,0,.32); }
+.tmap-search-icon {
+  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  font-size: 14px; pointer-events: none;
+}
+.tmap-search-results {
+  position: absolute; top: calc(100% + 6px); left: 0; right: 0; display: none;
+  background: rgba(10,15,30,.96); border: 1px solid rgba(245,184,0,.2);
+  border-radius: 14px; overflow: hidden;
+  box-shadow: 0 14px 44px rgba(0,0,0,.55);
+  backdrop-filter: blur(18px); z-index: 800;
+}
+.tmap-search-results.show { display: block; }
+#page-travelmap.tmap-light .tmap-search-results {
+  background: rgba(255,255,255,.98); border-color: rgba(0,0,0,.09);
+}
+.tmap-sr-item {
+  padding: 11px 16px; cursor: pointer;
+  font-family: 'Inter', sans-serif; font-size: 13px;
+  color: rgba(255,255,255,.75); border-bottom: 1px solid rgba(255,255,255,.05);
+  display: flex; align-items: center; gap: 9px; transition: background .15s;
+}
+.tmap-sr-item:last-child { border-bottom: none; }
+.tmap-sr-item:hover { background: rgba(245,184,0,.1); color: #f5b800; }
+#page-travelmap.tmap-light .tmap-sr-item { color: #333; border-bottom-color: rgba(0,0,0,.05); }
+#page-travelmap.tmap-light .tmap-sr-item:hover { background: rgba(74,68,40,.07); color: var(--olive); }
+.tmap-sr-loading {
+  padding: 14px 16px; text-align: center;
+  font-family: 'Inter', sans-serif; font-size: 12px; color: rgba(255,255,255,.35);
+}
+#page-travelmap.tmap-light .tmap-sr-loading { color: rgba(0,0,0,.35); }
+
+/* Map body */
+.tmap-body { flex: 1; position: relative; overflow: hidden; }
+#travel-map { width: 100%; height: 100%; }
+#travel-map .leaflet-container { background: #0d1b35 !important; }
+#page-travelmap.tmap-light #travel-map .leaflet-container { background: #dce9f5 !important; }
+
+/* Zoom control style overrides for travel map */
+#travel-map .leaflet-control-zoom { border: none !important; }
+#travel-map .leaflet-control-zoom a {
+  background: rgba(10,15,30,.88) !important; color: #f5b800 !important;
+  border: 1px solid rgba(245,184,0,.25) !important; font-weight: 700 !important;
+}
+#travel-map .leaflet-control-zoom a:hover { background: rgba(245,184,0,.15) !important; }
+#page-travelmap.tmap-light #travel-map .leaflet-control-zoom a {
+  background: rgba(255,255,255,.9) !important; color: var(--olive) !important;
+  border-color: rgba(74,68,40,.2) !important;
+}
+#travel-map .leaflet-control-attribution {
+  background: rgba(0,0,0,.45) !important; color: rgba(255,255,255,.3) !important;
+  font-size: 9px !important; border-radius: 8px 0 0 0 !important;
+}
+#travel-map .leaflet-control-attribution a { color: rgba(255,255,255,.45) !important; }
+
+/* Custom popup for travel map */
+.tmap-popup .leaflet-popup-content-wrapper {
+  background: rgba(10,15,30,.93); border: 1px solid rgba(245,184,0,.3);
+  border-radius: 14px; box-shadow: 0 10px 36px rgba(0,0,0,.6);
+  backdrop-filter: blur(14px); color: #fff;
+}
+.tmap-popup .leaflet-popup-content { margin: 12px 16px; }
+.tmap-popup .leaflet-popup-tip { background: rgba(10,15,30,.93); }
+.tmap-popup .leaflet-popup-close-button { color: rgba(255,255,255,.4) !important; top:8px !important; right:8px !important; }
+.tmap-popup .leaflet-popup-close-button:hover { color: #f5b800 !important; }
+.tmap-popup-title { font-family:'Playfair Display',serif; font-size:14px; font-weight:700; color:#f5b800; }
+.tmap-popup-sub { font-family:'Inter',sans-serif; font-size:11px; color:rgba(255,255,255,.5); margin-top:2px; }
+.tmap-popup-link {
+  display:inline-block; margin-top:8px; padding:5px 12px; border-radius:10px;
+  background:rgba(245,184,0,.15); border:1px solid rgba(245,184,0,.3);
+  font-family:'Inter',sans-serif; font-size:11px; font-weight:600; color:#f5b800; cursor:pointer;
+}
+
+/* Floating toolbar */
+.tmap-toolbar {
+  position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%);
+  z-index: 600; display: flex; gap: 4px; align-items: center;
+  background: rgba(8,13,28,.88); border: 1px solid rgba(255,255,255,.1);
+  backdrop-filter: blur(18px); border-radius: 30px; padding: 5px 8px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.55);
+}
+#page-travelmap.tmap-light .tmap-toolbar {
+  background: rgba(255,255,255,.92); border-color: rgba(0,0,0,.08);
+}
+.tmap-tb-btn {
+  display: flex; align-items: center; gap: 5px; padding: 7px 14px;
+  border-radius: 22px; background: none; border: none; cursor: pointer;
+  font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600;
+  color: rgba(255,255,255,.55); transition: all .2s; white-space: nowrap;
+}
+.tmap-tb-btn:hover { background: rgba(245,184,0,.12); color: #f5b800; }
+.tmap-tb-btn.active { background: rgba(245,184,0,.2); color: #f5b800; }
+.tmap-tb-sep { width: 1px; height: 20px; background: rgba(255,255,255,.1); margin: 0 2px; }
+#page-travelmap.tmap-light .tmap-tb-btn { color: rgba(0,0,0,.45); }
+#page-travelmap.tmap-light .tmap-tb-btn:hover,
+#page-travelmap.tmap-light .tmap-tb-btn.active { background: rgba(74,68,40,.1); color: var(--olive); }
+#page-travelmap.tmap-light .tmap-tb-sep { background: rgba(0,0,0,.1); }
+
+/* Memory preview panel */
+.tmap-preview-panel {
+  position: absolute; top: 14px; right: 14px; bottom: 68px; width: 275px;
+  z-index: 600; background: rgba(8,13,28,.93);
+  border: 1px solid rgba(245,184,0,.22); border-radius: 20px;
+  backdrop-filter: blur(22px); box-shadow: 0 14px 44px rgba(0,0,0,.55);
+  display: flex; flex-direction: column;
+  transform: translateX(310px); transition: transform .38s cubic-bezier(.22,1,.36,1);
+  overflow: hidden;
+}
+.tmap-preview-panel.open { transform: translateX(0); }
+#page-travelmap.tmap-light .tmap-preview-panel {
+  background: rgba(255,255,255,.96); border-color: rgba(0,0,0,.08);
+}
+.tmap-pp-close {
+  position: absolute; top: 10px; right: 10px; z-index: 2;
+  background: rgba(255,255,255,.1); border: none; border-radius: 50%;
+  width: 26px; height: 26px; cursor: pointer; font-size: 12px;
+  color: rgba(255,255,255,.55); display: flex; align-items: center; justify-content: center;
+  transition: all .2s;
+}
+.tmap-pp-close:hover { background: rgba(245,184,0,.2); color: #f5b800; }
+#page-travelmap.tmap-light .tmap-pp-close { background: rgba(0,0,0,.07); color: rgba(0,0,0,.4); }
+.tmap-pp-hero {
+  height: 86px; flex-shrink: 0; position: relative;
+  background: linear-gradient(135deg,#14213d 0%,#2c1654 100%);
+  display: flex; align-items: center; justify-content: center;
+}
+.tmap-pp-emoji { font-size: 38px; filter: drop-shadow(0 2px 10px rgba(0,0,0,.4)); }
+.tmap-pp-body { padding: 15px; overflow-y: auto; flex: 1; }
+.tmap-pp-body::-webkit-scrollbar { width: 4px; }
+.tmap-pp-body::-webkit-scrollbar-thumb { background: rgba(245,184,0,.3); border-radius: 2px; }
+.tmap-pp-dest {
+  font-family: 'DM Serif Display', serif; font-size: 18px;
+  color: #f5b800; margin-bottom: 3px;
+}
+#page-travelmap.tmap-light .tmap-pp-dest { color: var(--olive); }
+.tmap-pp-meta {
+  font-family: 'Inter', sans-serif; font-size: 11px;
+  color: rgba(255,255,255,.42); margin-bottom: 13px; letter-spacing: .3px;
+}
+#page-travelmap.tmap-light .tmap-pp-meta { color: rgba(0,0,0,.38); }
+.tmap-pp-snip-lbl {
+  font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .8px;
+  color: rgba(255,255,255,.28); margin-bottom: 6px;
+}
+#page-travelmap.tmap-light .tmap-pp-snip-lbl { color: rgba(0,0,0,.28); }
+.tmap-pp-snippet {
+  font-family: 'Inter', sans-serif; font-size: 12.5px; line-height: 1.65;
+  color: rgba(255,255,255,.65); font-style: italic;
+  background: rgba(255,255,255,.04); border-left: 2px solid rgba(245,184,0,.4);
+  padding: 8px 11px; border-radius: 0 9px 9px 0; margin-bottom: 13px;
+}
+#page-travelmap.tmap-light .tmap-pp-snippet {
+  color: rgba(0,0,0,.5); background: rgba(0,0,0,.03); border-left-color: var(--olive);
+}
+.tmap-pp-rating { display: flex; gap: 3px; margin-bottom: 13px; font-size: 13px; }
+.tmap-pp-open-btn {
+  width: 100%; padding: 10px; border-radius: 11px;
+  background: linear-gradient(135deg,var(--olive) 0%,#3d3820 100%);
+  border: none; color: #f5b800;
+  font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 700;
+  cursor: pointer; transition: all .2s;
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+}
+.tmap-pp-open-btn:hover { transform: translateY(-1px); box-shadow: 0 5px 20px rgba(245,184,0,.25); }
+
+/* Timeline panel */
+.tmap-timeline-panel {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 590;
+  height: 0; overflow: hidden;
+  transition: height .4s cubic-bezier(.22,1,.36,1);
+  background: rgba(8,13,28,.95); border-top: 1px solid rgba(245,184,0,.14);
+  backdrop-filter: blur(18px);
+}
+.tmap-timeline-panel.open { height: 190px; }
+#page-travelmap.tmap-light .tmap-timeline-panel {
+  background: rgba(255,255,255,.97); border-top-color: rgba(0,0,0,.06);
+}
+.tmap-tl-header {
+  padding: 12px 20px 4px;
+  font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 1px;
+  color: rgba(255,255,255,.3);
+}
+#page-travelmap.tmap-light .tmap-tl-header { color: rgba(0,0,0,.3); }
+.tmap-tl-scroller {
+  display: flex; gap: 10px; padding: 4px 20px 16px;
+  overflow-x: auto; align-items: center;
+}
+.tmap-tl-scroller::-webkit-scrollbar { height: 3px; }
+.tmap-tl-scroller::-webkit-scrollbar-thumb { background: rgba(245,184,0,.3); border-radius: 2px; }
+.tmap-tl-card {
+  flex-shrink: 0; width: 130px; padding: 11px 12px; text-align: center;
+  background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08);
+  border-radius: 14px; cursor: pointer; transition: all .2s;
+}
+.tmap-tl-card:hover { background: rgba(245,184,0,.1); border-color: rgba(245,184,0,.35); transform: translateY(-2px); }
+#page-travelmap.tmap-light .tmap-tl-card { background: rgba(0,0,0,.04); border-color: rgba(0,0,0,.08); }
+#page-travelmap.tmap-light .tmap-tl-card:hover { background: rgba(74,68,40,.08); border-color: var(--olive); }
+.tmap-tl-card-emoji { font-size: 22px; margin-bottom: 5px; }
+.tmap-tl-card-dest {
+  font-family: 'Playfair Display', serif; font-size: 12px; font-weight: 700;
+  color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px;
+}
+#page-travelmap.tmap-light .tmap-tl-card-dest { color: var(--olive); }
+.tmap-tl-card-date {
+  font-family: 'Inter', sans-serif; font-size: 10px; color: rgba(255,255,255,.35);
+}
+#page-travelmap.tmap-light .tmap-tl-card-date { color: rgba(0,0,0,.35); }
+
+/* Geocoding loading overlay */
+.tmap-geo-loading {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+  z-index: 700; background: rgba(10,15,30,.88);
+  border: 1px solid rgba(245,184,0,.25); border-radius: 22px;
+  padding: 8px 18px; display: flex; align-items: center; gap: 10px;
+  font-family: 'Inter', sans-serif; font-size: 12px; color: rgba(255,255,255,.65);
+  backdrop-filter: blur(12px); pointer-events: none;
+  box-shadow: 0 6px 24px rgba(0,0,0,.4);
+}
+.tmap-geo-spinner {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid rgba(245,184,0,.2); border-top-color: #f5b800;
+  animation: tmapSpin .7s linear infinite; flex-shrink: 0;
+}
+@keyframes tmapSpin { to { transform: rotate(360deg); } }
+
+/* Empty state */
+.tmap-empty-state {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  z-index: 600; text-align: center; pointer-events: none;
+}
+.tmap-empty-state-icon { font-size: 48px; margin-bottom: 12px; }
+.tmap-empty-state-text {
+  font-family: 'DM Serif Display', serif; font-size: 18px;
+  color: rgba(255,255,255,.4); margin-bottom: 6px;
+}
+.tmap-empty-state-sub {
+  font-family: 'Inter', sans-serif; font-size: 13px; color: rgba(255,255,255,.25);
+}
+
+/* Mobile responsive */
+@media (max-width: 600px) {
+  .tmap-topbar { padding: 0 14px; height: 52px; }
+  .tmap-stats-bar { padding: 0 14px; }
+  .tmap-searchbar { padding: 8px 12px; }
+  .tmap-toolbar { bottom: 14px; }
+  .tmap-tb-btn { padding: 6px 10px; font-size: 11px; }
+  .tmap-preview-panel {
+    width: calc(100% - 24px); top: auto; bottom: 74px;
+    max-height: 240px; right: 12px; left: 12px;
+  }
+  .tmap-timeline-panel.open { height: 168px; }
+}
 </style>
 </head>
 <body>
@@ -1164,6 +1527,7 @@ textarea::placeholder { color:#c4b896; }
         <button class="nav-link active" id="nl-home" onclick="showPage('home')"><span class="nl-icon">🌍</span><span class="nl-label">Home</span></button>
         <button class="nav-link" id="nl-memories" onclick="showPage('memories')"><span class="nl-icon">📖</span><span class="nl-label">My Memories</span><span class="nl-count">7</span></button>
         <button class="nav-link" id="nl-plan" onclick="showPage('plan')"><span class="nl-icon">🗺️</span><span class="nl-label">Trip Planner</span><span class="nl-count">2</span></button>
+        <button class="nav-link" id="nl-travelmap" onclick="showPage('travelmap')"><span class="nl-icon">🌐</span><span class="nl-label">Travel Map</span></button>
         <div class="nav-section-label">Account</div>
         <button class="nav-link" id="nl-profile" onclick="showPage('profile')"><span class="nl-icon">👤</span><span class="nl-label">Profile</span></button>
         <button class="nav-link" onclick="showToast('Settings coming soon!')"><span class="nl-icon">⚙️</span><span class="nl-label">Settings</span></button>
@@ -1436,6 +1800,119 @@ textarea::placeholder { color:#c4b896; }
         </div>
       </div>
 
+      <!-- ── TRAVEL MAP PAGE ── -->
+      <div class="page-panel" id="page-travelmap">
+
+        <!-- Top bar -->
+        <div class="tmap-topbar">
+          <div class="tmap-title">
+            <button class="tmap-back-btn" onclick="showPage('home')" title="Back to Home">←</button>
+            🌐 Travel Map
+          </div>
+          <div class="tmap-topbar-actions">
+            <button class="tmap-icon-btn" id="tmap-theme-btn" onclick="toggleTmapTheme()">☀️ Light</button>
+            <button class="tmap-icon-btn" onclick="shareTravelMap()">📤 Share</button>
+          </div>
+        </div>
+
+        <!-- Stats bar -->
+        <div class="tmap-stats-bar">
+          <div class="tmap-stat">
+            <span>✈️</span>
+            <span class="tmap-stat-num" id="tmap-stat-countries">–</span>
+            <span>Countries</span>
+          </div>
+          <div class="tmap-stat-sep"></div>
+          <div class="tmap-stat">
+            <span>📍</span>
+            <span class="tmap-stat-num" id="tmap-stat-cities">–</span>
+            <span>Cities</span>
+          </div>
+          <div class="tmap-stat-sep"></div>
+          <div class="tmap-stat">
+            <span>📖</span>
+            <span class="tmap-stat-num" id="tmap-stat-memories">–</span>
+            <span>Memories</span>
+          </div>
+          <div class="tmap-stat-sep"></div>
+          <div class="tmap-stat">
+            <span>🗓️</span>
+            <span class="tmap-stat-num" id="tmap-stat-years">–</span>
+            <span>Years Traveling</span>
+          </div>
+        </div>
+
+        <!-- Search bar -->
+        <div class="tmap-searchbar">
+          <div class="tmap-search-wrap">
+            <span class="tmap-search-icon">🔍</span>
+            <input
+              type="text"
+              class="tmap-search-input"
+              id="tmap-search-input"
+              placeholder="Search any city, landmark, country…"
+              oninput="debounceTmapSearch(this.value)"
+              onkeydown="if(event.key==='Escape')closeTmapSearch()"
+              autocomplete="off"
+            />
+            <div class="tmap-search-results" id="tmap-search-results"></div>
+          </div>
+        </div>
+
+        <!-- Map body -->
+        <div class="tmap-body" onclick="closeTmapSearch()">
+          <!-- Leaflet map -->
+          <div id="travel-map"></div>
+
+          <!-- Geocoding progress indicator -->
+          <div class="tmap-geo-loading" id="tmap-geo-loading" style="display:none;">
+            <div class="tmap-geo-spinner"></div>
+            <span id="tmap-geo-status">Mapping your journeys…</span>
+          </div>
+
+          <!-- Empty state -->
+          <div class="tmap-empty-state" id="tmap-empty-state" style="display:none;">
+            <div class="tmap-empty-state-icon">🗺️</div>
+            <div class="tmap-empty-state-text">No memories to map yet</div>
+            <div class="tmap-empty-state-sub">Add memories with destinations to see them here</div>
+          </div>
+
+          <!-- Floating toolbar -->
+          <div class="tmap-toolbar">
+            <button class="tmap-tb-btn active" id="tb-markers"  onclick="toggleTmapLayer('markers')">📍 Pins</button>
+            <div class="tmap-tb-sep"></div>
+            <button class="tmap-tb-btn"        id="tb-journey"  onclick="toggleTmapLayer('journey')">〰️ Journey</button>
+            <div class="tmap-tb-sep"></div>
+            <button class="tmap-tb-btn"        id="tb-heatmap"  onclick="toggleTmapLayer('heatmap')">🔥 Heat</button>
+            <div class="tmap-tb-sep"></div>
+            <button class="tmap-tb-btn"        id="tb-timeline" onclick="toggleTmapTimeline()">📅 Timeline</button>
+          </div>
+
+          <!-- Memory preview panel (slides from right) -->
+          <div class="tmap-preview-panel" id="tmap-preview-panel">
+            <button class="tmap-pp-close" onclick="closeTmapPreview()">✕</button>
+            <div class="tmap-pp-hero">
+              <span class="tmap-pp-emoji" id="tmap-pp-emoji">🌍</span>
+            </div>
+            <div class="tmap-pp-body">
+              <div class="tmap-pp-dest" id="tmap-pp-dest">Destination</div>
+              <div class="tmap-pp-meta" id="tmap-pp-meta"></div>
+              <div class="tmap-pp-snip-lbl">Best Memory</div>
+              <div class="tmap-pp-snippet" id="tmap-pp-snippet">No diary entry yet.</div>
+              <div class="tmap-pp-rating" id="tmap-pp-rating"></div>
+              <button class="tmap-pp-open-btn" onclick="openTmapMemory()">📖 Open Full Diary →</button>
+            </div>
+          </div>
+
+          <!-- Timeline panel (slides up from bottom) -->
+          <div class="tmap-timeline-panel" id="tmap-timeline-panel">
+            <div class="tmap-tl-header">Your Journey Timeline</div>
+            <div class="tmap-tl-scroller" id="tmap-tl-scroller"></div>
+          </div>
+
+        </div><!-- end .tmap-body -->
+      </div><!-- end #page-travelmap -->
+
     </div><!-- end .main-area -->
   </div><!-- end .website-shell -->
 </div><!-- end #pg-app -->
@@ -1641,6 +2118,7 @@ function showPage(pageId) {
     'memories':      'nl-memories',
     'memory-detail': 'nl-memories',
     'plan':          'nl-plan',
+    'travelmap':     'nl-travelmap',
     'profile':       'nl-profile',
   };
   const navId = navMap[pageId];
@@ -1653,9 +2131,10 @@ function showPage(pageId) {
   goTo('pg-app');
 
   // load data for page
-  if (pageId === 'memories') loadMemories();
-  if (pageId === 'plan')     loadTrips();
-  if (pageId === 'home')     initWorldMap();
+  if (pageId === 'memories')  loadMemories();
+  if (pageId === 'plan')      loadTrips();
+  if (pageId === 'home')      initWorldMap();
+  if (pageId === 'travelmap') initTravelMap();
 
   // scroll page to top
   if (target) target.scrollTop = 0;
@@ -2405,6 +2884,348 @@ function showToast(msg) {
   t.textContent = msg; t.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+/* ══════════════════════════════════════════════════════
+   TRAVEL MAP — full interactive travel history map
+══════════════════════════════════════════════════════ */
+let _tmap            = null;   // Leaflet instance
+let _tmapMarkersGrp  = null;   // L.layerGroup for pins
+let _tmapJourneyGrp  = null;   // L.layerGroup for journey arcs
+let _tmapHeatLayer   = null;   // L.heatLayer
+let _tmapTheme       = 'dark';
+let _tmapLayers      = { markers: true, journey: false, heatmap: false };
+let _tmapActiveMemId = null;
+let _tmapSearchTimer = null;
+let _tmapPlaced      = [];     // memories with resolved {lat,lng}
+let _tmapGeocache    = JSON.parse(localStorage.getItem('wp_geocache') || '{}');
+let _tmapLoading     = false;
+
+/* ── Init ── */
+async function initTravelMap() {
+  if (typeof L === 'undefined') return;
+  updateTmapStats();
+  if (_tmap) {
+    setTimeout(() => _tmap.invalidateSize(), 60);
+    await reloadTravelMarkers();
+    return;
+  }
+  _tmap = L.map('travel-map', {
+    center: [20, 10], zoom: 2,
+    minZoom: 1, maxZoom: 18,
+    zoomControl: true,
+    scrollWheelZoom: true,
+    worldCopyJump: true,
+  });
+  _tmap.zoomControl.setPosition('topright');
+
+  // Two tile layers (dark + light)
+  _tmap._tileDark  = L.tileLayer(
+    'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    { attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>', subdomains: 'abcd', maxZoom: 20 }
+  );
+  _tmap._tileLight = L.tileLayer(
+    'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    { attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>', subdomains: 'abcd', maxZoom: 20 }
+  );
+  _tmap._tileDark.addTo(_tmap);
+
+  _tmapMarkersGrp = L.layerGroup().addTo(_tmap);
+  _tmapJourneyGrp = L.layerGroup();
+
+  await reloadTravelMarkers();
+}
+
+function updateTmapStats() {
+  const mems = memories || [];
+  const countries = new Set(mems.map(m => m.country).filter(Boolean));
+  const cities    = new Set(mems.map(m => m.destination_name).filter(Boolean));
+  const years     = new Set(mems.map(m => (m.date_visited||'').slice(0,4)).filter(Boolean));
+  const s = id => document.getElementById(id);
+  if (s('tmap-stat-countries')) s('tmap-stat-countries').textContent = countries.size;
+  if (s('tmap-stat-cities'))    s('tmap-stat-cities').textContent    = cities.size;
+  if (s('tmap-stat-memories'))  s('tmap-stat-memories').textContent  = mems.length;
+  if (s('tmap-stat-years'))     s('tmap-stat-years').textContent     = years.size;
+}
+
+/* ── Geocoding via Nominatim + localStorage cache ── */
+async function tmapGeocode(name, country) {
+  const key = `${name}|${country||''}`.toLowerCase().trim();
+  if (_tmapGeocache[key]) return _tmapGeocache[key];
+  try {
+    const q   = encodeURIComponent(country ? `${name}, ${country}` : name);
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${q}&limit=1`;
+    const r   = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+    const d   = await r.json();
+    if (d && d[0]) {
+      const coords = { lat: +d[0].lat, lng: +d[0].lon };
+      _tmapGeocache[key] = coords;
+      localStorage.setItem('wp_geocache', JSON.stringify(_tmapGeocache));
+      return coords;
+    }
+  } catch(e) {}
+  return null;
+}
+
+/* ── Load all memory markers ── */
+async function reloadTravelMarkers() {
+  if (!_tmap || _tmapLoading) return;
+  _tmapLoading = true;
+  _tmapMarkersGrp.clearLayers();
+  if (_tmapJourneyGrp) _tmapJourneyGrp.clearLayers();
+  if (_tmapHeatLayer)  { _tmap.removeLayer(_tmapHeatLayer); _tmapHeatLayer = null; }
+  _tmapPlaced = [];
+
+  const toMap = (memories || []).filter(m => m.destination_name);
+  if (!toMap.length) {
+    const em = document.getElementById('tmap-empty-state');
+    if (em) em.style.display = 'block';
+    _tmapLoading = false;
+    return;
+  }
+  const em2 = document.getElementById('tmap-empty-state');
+  if (em2) em2.style.display = 'none';
+
+  const loadEl   = document.getElementById('tmap-geo-loading');
+  const statusEl = document.getElementById('tmap-geo-status');
+  if (loadEl) loadEl.style.display = 'flex';
+
+  for (let i = 0; i < toMap.length; i++) {
+    const m   = toMap[i];
+    const key = `${m.destination_name}|${m.country||''}`.toLowerCase().trim();
+    const cached = !!_tmapGeocache[key];
+    if (statusEl) statusEl.textContent = `Mapping ${m.destination_name}… (${i+1}/${toMap.length})`;
+
+    const coords = await tmapGeocode(m.destination_name, m.country);
+    if (coords) {
+      const placed = { ...m, lat: coords.lat, lng: coords.lng };
+      _tmapPlaced.push(placed);
+      if (_tmapLayers.markers) addTmapPin(placed);
+    }
+    // Respect Nominatim 1 req/sec for uncached calls
+    if (!cached) await new Promise(r => setTimeout(r, 380));
+  }
+
+  if (loadEl) loadEl.style.display = 'none';
+  _tmapLoading = false;
+
+  // Restore active layers
+  if (_tmapLayers.journey) { drawTmapJourney(); _tmapJourneyGrp.addTo(_tmap); }
+  if (_tmapLayers.heatmap) drawTmapHeat();
+
+  // Fit map to all points
+  if (_tmapPlaced.length > 0) {
+    const bounds = L.latLngBounds(_tmapPlaced.map(m => [m.lat, m.lng]));
+    _tmap.fitBounds(bounds, { padding: [60, 60], maxZoom: 7 });
+  }
+  renderTmapTimeline();
+}
+
+/* ── Custom emoji marker ── */
+function makeTmapIcon(emoji) {
+  const e = emoji || '📍';
+  return L.divIcon({
+    className: '',
+    html: `<div style="position:relative;width:38px;height:38px;display:flex;align-items:center;justify-content:center;">
+             <div style="position:absolute;inset:0;border-radius:50%;background:rgba(245,184,0,.15);border:1.5px solid rgba(245,184,0,.4);animation:markerPulse 2.5s ease-out infinite;"></div>
+             <div style="width:32px;height:32px;border-radius:50%;background:rgba(10,15,30,.92);border:2px solid rgba(245,184,0,.75);display:flex;align-items:center;justify-content:center;font-size:15px;box-shadow:0 3px 14px rgba(0,0,0,.55);position:relative;z-index:1;">${e}</div>
+           </div>`,
+    iconSize:    [38, 38],
+    iconAnchor:  [19, 19],
+    popupAnchor: [0, -22],
+  });
+}
+
+function addTmapPin(mem) {
+  const marker = L.marker([mem.lat, mem.lng], { icon: makeTmapIcon(mem.hero_emoji) });
+  const popupHtml = `
+    <div class="tmap-popup-title">${mem.hero_emoji||''} ${mem.destination_name||''}</div>
+    <div class="tmap-popup-sub">${mem.country||''} · ${mem.date_visited||'–'}</div>
+    <div class="tmap-popup-link" onclick="showTmapPreview('${mem.id}');this.closest('.leaflet-popup').querySelector('.leaflet-popup-close-button')?.click()">View diary →</div>`;
+  marker.bindPopup(popupHtml, { className: 'tmap-popup', maxWidth: 220, closeButton: true });
+  marker.on('click', () => { marker.openPopup(); showTmapPreview(mem.id); });
+  marker.addTo(_tmapMarkersGrp);
+}
+
+/* ── Preview panel ── */
+function showTmapPreview(memId) {
+  const m = (memories || []).find(x => x.id === memId);
+  if (!m) return;
+  _tmapActiveMemId = memId;
+  document.getElementById('tmap-pp-emoji').textContent = m.hero_emoji || '🌍';
+  document.getElementById('tmap-pp-dest').textContent  = m.destination_name || '–';
+  document.getElementById('tmap-pp-meta').textContent  =
+    `${m.date_visited ? '📅 ' + m.date_visited : ''}${m.country ? '  🌏 ' + m.country : ''}`;
+  const raw = m.best_memory || m.open_journal || m.food_diary || 'No diary entry yet.';
+  document.getElementById('tmap-pp-snippet').textContent = raw.length > 150 ? raw.slice(0, 147) + '…' : raw;
+  const r = m.trip_rating || 0;
+  document.getElementById('tmap-pp-rating').innerHTML =
+    [1,2,3,4,5].map(n => `<span>${n <= r ? '⭐' : '☆'}</span>`).join('');
+  document.getElementById('tmap-preview-panel').classList.add('open');
+}
+function closeTmapPreview() {
+  document.getElementById('tmap-preview-panel').classList.remove('open');
+  _tmapActiveMemId = null;
+}
+function openTmapMemory() {
+  if (!_tmapActiveMemId) return;
+  const id = _tmapActiveMemId;
+  closeTmapPreview();
+  openMemoryDetail(id);
+}
+
+/* ── Journey arcs ── */
+function drawTmapJourney() {
+  _tmapJourneyGrp.clearLayers();
+  const sorted = [..._tmapPlaced].sort((a,b) =>
+    new Date(a.date_visited||0) - new Date(b.date_visited||0));
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const a = sorted[i], b = sorted[i+1];
+    // Great-circle arc approximation
+    const pts = [], steps = 40;
+    for (let s = 0; s <= steps; s++) {
+      const t   = s / steps;
+      const lat = a.lat + (b.lat - a.lat) * t;
+      const lng = a.lng + (b.lng - a.lng) * t;
+      const arc = Math.sin(Math.PI * t) *
+                  Math.min(Math.abs(b.lat - a.lat) + Math.abs(b.lng - a.lng), 40) * 0.25;
+      pts.push([lat + arc, lng]);
+    }
+    L.polyline(pts, { color: '#f5b800', weight: 1.5, dashArray: '6 9', opacity: .55 })
+     .addTo(_tmapJourneyGrp);
+  }
+}
+
+/* ── Heatmap ── */
+function drawTmapHeat() {
+  if (typeof L.heatLayer === 'undefined') return;
+  if (_tmapHeatLayer) { _tmap.removeLayer(_tmapHeatLayer); }
+  const pts = _tmapPlaced.map(m => [m.lat, m.lng, 0.75]);
+  _tmapHeatLayer = L.heatLayer(pts, {
+    radius: 40, blur: 28, maxZoom: 8,
+    gradient: { 0.2: '#1a2a50', 0.5: '#8b4513', 0.8: '#f5b800', 1.0: '#ffffff' },
+  }).addTo(_tmap);
+}
+
+/* ── Layer toggles ── */
+function toggleTmapLayer(layer) {
+  _tmapLayers[layer] = !_tmapLayers[layer];
+  const btn = document.getElementById('tb-' + layer);
+  if (btn) btn.classList.toggle('active', _tmapLayers[layer]);
+
+  if (layer === 'markers') {
+    if (_tmapLayers.markers) { _tmapPlaced.forEach(m => addTmapPin(m)); }
+    else                     { _tmapMarkersGrp.clearLayers(); }
+  }
+  if (layer === 'journey') {
+    if (_tmapLayers.journey) { drawTmapJourney(); _tmapJourneyGrp.addTo(_tmap); }
+    else { if (_tmap.hasLayer(_tmapJourneyGrp)) _tmap.removeLayer(_tmapJourneyGrp); }
+  }
+  if (layer === 'heatmap') {
+    if (_tmapLayers.heatmap) { drawTmapHeat(); }
+    else if (_tmapHeatLayer) { _tmap.removeLayer(_tmapHeatLayer); _tmapHeatLayer = null; }
+  }
+}
+
+/* ── Timeline ── */
+function toggleTmapTimeline() {
+  const p   = document.getElementById('tmap-timeline-panel');
+  const btn = document.getElementById('tb-timeline');
+  p.classList.toggle('open');
+  btn.classList.toggle('active', p.classList.contains('open'));
+}
+function renderTmapTimeline() {
+  const el = document.getElementById('tmap-tl-scroller');
+  if (!el) return;
+  const sorted = [..._tmapPlaced].sort((a,b) =>
+    new Date(b.date_visited||0) - new Date(a.date_visited||0));
+  if (!sorted.length) {
+    el.innerHTML = `<div style="color:rgba(255,255,255,.3);font-family:'Inter',sans-serif;font-size:12px;padding:6px 0;">No memories mapped yet</div>`;
+    return;
+  }
+  el.innerHTML = sorted.map(m => `
+    <div class="tmap-tl-card" onclick="flyToTmapMem('${m.id}')">
+      <div class="tmap-tl-card-emoji">${m.hero_emoji || '📍'}</div>
+      <div class="tmap-tl-card-dest">${m.destination_name || ''}</div>
+      <div class="tmap-tl-card-date">${m.date_visited || '–'}</div>
+    </div>`).join('');
+}
+function flyToTmapMem(memId) {
+  const m = _tmapPlaced.find(x => x.id === memId);
+  if (!m || !_tmap) return;
+  _tmap.flyTo([m.lat, m.lng], 9, { duration: 1.6, easeLinearity: 0.4 });
+  setTimeout(() => showTmapPreview(memId), 900);
+}
+
+/* ── Dark / Light toggle ── */
+function toggleTmapTheme() {
+  if (!_tmap) return;
+  const panel = document.getElementById('page-travelmap');
+  const btn   = document.getElementById('tmap-theme-btn');
+  _tmapTheme = _tmapTheme === 'dark' ? 'light' : 'dark';
+  if (_tmapTheme === 'light') {
+    panel.classList.add('tmap-light');
+    if (_tmap.hasLayer(_tmap._tileDark))  _tmap.removeLayer(_tmap._tileDark);
+    _tmap._tileLight.addTo(_tmap);
+    if (btn) btn.textContent = '🌙 Dark';
+  } else {
+    panel.classList.remove('tmap-light');
+    if (_tmap.hasLayer(_tmap._tileLight)) _tmap.removeLayer(_tmap._tileLight);
+    _tmap._tileDark.addTo(_tmap);
+    if (btn) btn.textContent = '☀️ Light';
+  }
+}
+
+/* ── Search (Nominatim) ── */
+function debounceTmapSearch(val) {
+  clearTimeout(_tmapSearchTimer);
+  const el = document.getElementById('tmap-search-results');
+  if (!val || val.length < 2) { closeTmapSearch(); return; }
+  el.innerHTML = '<div class="tmap-sr-loading">Searching…</div>';
+  el.classList.add('show');
+  _tmapSearchTimer = setTimeout(() => runTmapSearch(val), 600);
+}
+async function runTmapSearch(val) {
+  const el = document.getElementById('tmap-search-results');
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(val)}&limit=5&addressdetails=0`;
+    const r   = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+    const d   = await r.json();
+    if (!d || !d.length) {
+      el.innerHTML = '<div class="tmap-sr-loading">No results found</div>';
+      return;
+    }
+    el.innerHTML = d.map(item => {
+      const name = item.display_name.split(',').slice(0, 3).join(', ');
+      const lat  = parseFloat(item.lat).toFixed(5);
+      const lng  = parseFloat(item.lon).toFixed(5);
+      return `<div class="tmap-sr-item" onclick="selectTmapResult(${lat},${lng},'${name.replace(/'/g,"\\'")}')">📍 ${name}</div>`;
+    }).join('');
+  } catch(e) {
+    el.innerHTML = '<div class="tmap-sr-loading">Search unavailable</div>';
+  }
+}
+function selectTmapResult(lat, lng, name) {
+  if (_tmap) _tmap.flyTo([lat, lng], 11, { duration: 1.5 });
+  closeTmapSearch();
+  document.getElementById('tmap-search-input').value = '';
+  showToast(`Flew to ${name.split(',')[0]}`);
+}
+function closeTmapSearch() {
+  const el = document.getElementById('tmap-search-results');
+  if (el) el.classList.remove('show');
+}
+
+/* ── Share ── */
+function shareTravelMap() {
+  const mems      = memories || [];
+  const countries = new Set(mems.map(m => m.country).filter(Boolean));
+  const text = `I've explored ${countries.size} countries with ${mems.length} travel memories on WanderPages! 🌍✈️`;
+  if (navigator.share) {
+    navigator.share({ title: 'My Travel Map — WanderPages', text }).catch(() => {});
+  } else {
+    navigator.clipboard?.writeText(text).then(() => showToast('Copied to clipboard! 📋'));
+  }
 }
 
 /* ── WORLD MAP (Leaflet) ── */
