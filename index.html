@@ -1655,6 +1655,7 @@ function showPage(pageId) {
   // load data for page
   if (pageId === 'memories') loadMemories();
   if (pageId === 'plan')     loadTrips();
+  if (pageId === 'home')     initWorldMap();
 
   // scroll page to top
   if (target) target.scrollTop = 0;
@@ -2407,12 +2408,16 @@ function showToast(msg) {
 }
 
 /* ── WORLD MAP (Leaflet) ── */
-(function initWorldMap() {
+let _wpMap = null;
+function initWorldMap() {
+  if (typeof L === 'undefined') return;
   const mapEl = document.getElementById('world-map');
-  if (!mapEl || typeof L === 'undefined') return;
+  if (!mapEl) return;
 
-  // Create map centered on world view
-  const map = L.map('world-map', {
+  // Already initialized — just fix size in case container was hidden
+  if (_wpMap) { setTimeout(() => _wpMap.invalidateSize(), 50); return; }
+
+  _wpMap = L.map('world-map', {
     center: [20, 10],
     zoom: 2,
     minZoom: 1,
@@ -2423,12 +2428,12 @@ function showToast(msg) {
     worldCopyJump: true,
   });
 
-  // CartoDB Dark Matter tiles — beautiful dark theme, free, no API key needed
+  // CartoDB Dark Matter — beautiful dark theme, free, no API key
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
     attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
     subdomains: 'abcd',
     maxZoom: 20,
-  }).addTo(map);
+  }).addTo(_wpMap);
 
   // Custom pulsing marker factory
   function makePulseIcon() {
@@ -2444,17 +2449,16 @@ function showToast(msg) {
     });
   }
 
-  // Destinations
   const destinations = [
-    { name: 'Singapore', sub: 'Southeast Asia 🇸🇬', latlng: [1.3521, 103.8198] },
-    { name: 'Paris',     sub: 'France 🇫🇷',          latlng: [48.8566,   2.3522] },
+    { name: 'Singapore', sub: 'Southeast Asia 🇸🇬', latlng: [1.3521,   103.8198] },
+    { name: 'Paris',     sub: 'France 🇫🇷',          latlng: [48.8566,    2.3522] },
     { name: 'New York',  sub: 'United States 🇺🇸',   latlng: [40.7128,  -74.0060] },
     { name: 'Sydney',    sub: 'Australia 🇦🇺',        latlng: [-33.8688, 151.2093] },
     { name: 'Dubai',     sub: 'UAE 🇦🇪',              latlng: [25.2048,   55.2708] },
   ];
 
   destinations.forEach(({ name, sub, latlng }) => {
-    const marker = L.marker(latlng, { icon: makePulseIcon() }).addTo(map);
+    const marker = L.marker(latlng, { icon: makePulseIcon() }).addTo(_wpMap);
     marker.bindPopup(
       `<div class="wp-popup-title">${name}</div><div class="wp-popup-sub">${sub}</div>`,
       { className: 'wp-popup', closeButton: true, maxWidth: 200 }
@@ -2462,10 +2466,12 @@ function showToast(msg) {
     marker.on('click', () => marker.openPopup());
   });
 
-  // Enable scroll wheel zoom only when map is focused
-  map.on('focus', () => map.scrollWheelZoom.enable());
-  map.on('blur',  () => map.scrollWheelZoom.disable());
-})();
+  _wpMap.on('focus', () => _wpMap.scrollWheelZoom.enable());
+  _wpMap.on('blur',  () => _wpMap.scrollWheelZoom.disable());
+
+  // Give layout time to settle then fix tile rendering
+  setTimeout(() => _wpMap.invalidateSize(), 100);
+}
 </script>
 </body>
 </html>
